@@ -1,0 +1,71 @@
+version: "1.25"
+
+networks:
+  ipvl:
+    driver: ipvlan
+    driver_opts:
+      parent: wlo1
+    ipam:
+      config:
+        - subnet: "192.168.1.0/24"
+          ip_range: "192.168.1.128/25" 
+          gateway: "192.168.1.254"
+
+volumes:
+  pgvol:
+    driver_opts:
+      o: bind
+      type: none
+      device: /home/kostyan/project/data/postgresql
+  omvol:
+    driver_opts:
+      o: bind
+      type: none
+      device: /home/kostyan/project/data/omdata
+
+services:
+
+  openmeetings:
+    container_name: openmeetings
+    image: apache/openmeetings:min-6.3.0
+    ports:
+      - 5443:5443
+      - 5080:5080  
+    volumes:
+      - omvol:/opt/omdata
+    environment:
+      - OM_KURENTO_WS_URL=ws://kurento:8888/kurento
+      - OM_DB_TYPE=postgresql
+      - OM_DB_HOST=postgresql
+      - OM_DB_PORT=5432
+      - OM_DB_USER=openmeetings
+      - OM_DB_PASS=openmeetings
+      - OM_DB_NAME=openmeetings
+    depends_on:
+      - kurento
+      - postgresql
+    restart: unless-stopped
+    networks:
+      - ipvl
+
+  kurento:
+    container_name: kurento
+    image: kurento/kurento-media-server:6
+    restart: unless-stopped
+    networks:
+      - ipvl
+
+  postgresql:
+    container_name: postgresql
+    image: postgres:15-alpine
+    volumes:
+      - pgvol:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=openmeetings
+      - POSTGRES_DB=openmeetings
+      - POSTGRES_PASSWORD=openmeetings
+    restart: unless-stopped
+    ports:
+      - 5432:5432
+    networks:
+      - ipvl
